@@ -182,7 +182,7 @@ The other factor I considered was income level, which was influenced by my inter
 \n 
 \n 
 Once I had selected my two traits to identify potential populations at risk, I mapped their percentage presence in the PUMAs.
-```{r}
+```{r, include=FALSE}
 
 ```
 
@@ -191,7 +191,7 @@ Once I had selected my two traits to identify potential populations at risk, I m
 In order to develop a map of at risk populations, I started with downloading PUMS data and selecting data relevant to the characteristics and geographical areas of interest. Working with PUMS is interesting because we know that the data we are working with is from specific households, though that does mean we are assuming that data from 1% of the households is representative of the larger area. It should also be noted that for this case, we are assuming household characteristics are that of the head of household. The final data which was plotted was determined by summing non-"white alone" households and all households with an income < $80,000.  
 
 
-```{r}
+```{r, include=FALSE}
 
 ```
 
