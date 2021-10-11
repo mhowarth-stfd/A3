@@ -1,0 +1,191 @@
+---
+title: "R Assignment 2"
+author: "Merrick Howarth"
+date: "Oct. 12, 2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, message = F, warning = F)
+```
+
+```{r libraries, include=FALSE}
+
+library(tidyverse)
+library(sf)
+library(tigris)
+library(mapview)
+library(leaflet)
+library(censusapi)
+
+Sys.setenv(CENSUS_KEY="dbcdeeed2f9e907f31811ee78c1f239a2aa77934")
+```
+
+
+
+
+```{r PUMAs, include=FALSE}
+# identifying PUMAs in bay area
+
+pums_2019_1yr <- readRDS("pums_data.rds")
+
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+bay_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+bay_pums <-
+  pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>% 
+  filter(PUMA %in% bay_pumas$PUMACE10)
+
+```
+
+
+```{r DataManipulation, include=FALSE}
+bay_pums_RaceInc <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    WGTP = as.numeric(WGTP),
+    nonwhite_lowinc = ifelse(
+      (RAC1P != 1) &
+        (HINCP < 80000),
+      WGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    perc_nonwhite_lowinc =
+      sum(nonwhite_lowinc, na.rm =T)/sum(WGTP, na.rm = T)*100
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+```
+
+
+```{r mapping, include=FALSE}
+pums_pal <- colorNumeric(
+  palette = "Purples",
+  domain = bay_pums_RaceInc$perc_nonwhite_renter_lowinc
+)
+
+map <- leaflet() %>%
+  addTiles() %>% 
+  addPolygons(
+    data = bay_pums_RaceInc,
+    fillColor = ~pums_pal(perc_nonwhite_lowinc),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(perc_nonwhite_lowinc), 
+      "% non-White households making less than $80K"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = bay_pums_RaceInc,
+    pal = pums_pal,
+    values = ~perc_nonwhite_lowinc,
+    title = "% non-White households<br>making less than $100K"
+  )
+```
+
+## Factors of interest for extreme heat
+
+As we have evaluated extreme heat events over this past week, I have had  two key pieces of knowledge I previously knew brought to mind. 
+
+
+\n 
+
+*1. Histrionically redlined communities experience more larger amounts of urban heat island effect.\n 
+
+  source: https://www.nytimes.com/interactive/2020/08/24/climate/racism-redlining-cities-global-warming.html
+  
+\n  
+\n 
+*2. The disproportionate mortality rate of affected Black people in the Chicago Heatwave of 1995.\n 
+
+  source: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1854989/
+  \n 
+  \n 
+  
+  
+This led me to my interest in identifying the POC population as an area of concern. I decided to consider the larger group of POC as opposed to only the Black population because of demographic differences between the areas mentioned above and the Bay Area. I was also personally curious to see if historically redlined communities would correlate on the map with the higher concentrations of my populations of interest. I investigated this but found PUMAs to be too large of areas to correlate well with identified historical redlined areas.
+
+
+\n 
+\n 
+The other factor I considered was income level, which was influenced by my interview findings. I had discussed with my interviewee how income limitations can make staying cool difficult, she especially found this in New Orleans in the wake of Hurricane Ida. Considering increase of potential danger due to income constraints, I was also interested in identifying low income households as a potential at risk population. Since incomes vary greatly across the bay area, I selected $80,000 as a middle ground from incomes identified in the following source. \n
+
+  source: https://bayareaequityatlas.org/node/60841
+  
+\n 
+\n 
+Once I had selected my two traits to identify potential populations at risk, I mapped their percentage presence in the PUMAs.
+
+
+```{r, include=FALSE}
+j<-7
+```
+
+
+## Mapping Potential Populations at Risk
+
+In order to develop a map of at risk populations, I started with downloading PUMS data and selecting data relevant to the characteristics and geographical areas of interest. Working with PUMS is interesting because we know that the data we are working with is from specific households, though that does mean we are assuming that data from 1% of the households is representative of the larger area. It should also be noted that for this case, we are assuming household characteristics are that of the head of household. The final data which was plotted was determined by summing non-"white alone" households and all households with an income < $80,000.  
+
+
+```{r, include=FALSE}
+j<-7
+```
+
+## Findings:
+Map of percentage of non-White households making less than $80,000 in the bay area
+```{r}
+map
+```
+
+The map of the sub populations of interest which I identified is shown above. Looking at the map, I think it is very interesting seeing how high the percentage of low-income is in some of these areas. I am additionally surprised at the areas where these populations are nearly non-existent and left to wonder if it is because there is a lack of racial diversity or low income people in these ares, or both. These findings leave me with two further questions: are these low income families below the poverty line in these areas and what the sub-populations of race and income would look like on their own.
+\n 
+\n  
+Ultimately, while I have identified these groups as populations at risk for heat related illness based on my understanding of heat's impact in other areas of the United States, I do not know if these are actually the at risk populations in the Bay Area. It would be interesting to compare my developed map to a map of reported cases of heat related illness and deaths for the Bay Area to determine if my identified populations at risk are accurate.  
+
+
+
